@@ -1,46 +1,101 @@
-# 客戶健康分數＋續約風險預警工具
+# CSM 客戶成功儀表板
 
-CSM 求職作品：上傳客戶資料 CSV，自動算出健康分數、續約風險燈號，並產生風險說明與建議行動。
+多客戶管理視角的客戶成功工具：組合層看 ARR / NRR / GRR / NPS / CSAT / 採用率，
+點進單一客戶看導入里程碑、QBR 紀錄、續約進度與 Champion 地圖。
+
+> ⚠️ 展示模式的所有客戶、人名、金額與事件皆為虛構，不對應任何真實企業或個人。
+
+## 兩種模式
+
+| 模式 | 內容 | 用途 |
+| :-- | :-- | :-- |
+| **展示模式**（預設） | 內建 14 家虛構客戶（12 家有效＋2 家已流失）的完整資料，含里程碑、會議、續約、聯絡人 | 打開就是完整儀表板，不需上傳任何檔案 |
+| **上傳模式** | 上傳自己的 CSV，算出健康分數與收入指標 | 證明工具吃得下外部資料。導入／QBR／續約／聯絡人細節僅展示模式提供 |
+
+展示資料的日期全部以「今天」為基準動態產生，所以這份 demo 不會隨時間過期。
+
+## 五個頁面
+
+1. **總覽** — 收入 / 體驗 / 採用三組 KPI、ARR 變動橋接圖、生命週期分佈、需要關注的客戶、本週必須處理
+2. **客戶列表** — 搜尋與篩選，點任一列進入客戶詳情
+3. **客戶詳情** — 健康分數構面拆解、風險說明與建議行動，加四個分頁：導入里程碑 / QBR 紀錄 / 續約進度 / Champion 地圖
+4. **續約管理** — 30/60/90 天到期窗口、加權預估續約金額、續約階段分佈、下一步行動
+5. **指標字典** — 每個指標的定義、公式、本表實際數值與為什麼重要
 
 ## 本機執行
 
 ```bash
-# 第一次使用，先安裝套件（已經做過可跳過）
-./venv/Scripts/python.exe -m pip install -r requirements.txt
-
-# 啟動
+cd 100_Todo/projects/csm-health-score-tool
 ./venv/Scripts/python.exe -m streamlit run app.py
 ```
 
-開啟瀏覽器 http://localhost:8501，上傳 `demo-customers.csv` 就能看到完整結果。
+開啟 http://localhost:8501 即可。第一次使用需先安裝套件：
 
-## 設定真實 AI（Claude API）生成風險說明
+```bash
+./venv/Scripts/python.exe -m pip install -r requirements.txt
+```
 
-目前沒有設定金鑰時，系統會自動用內建的規則引擎生成風險說明（已驗證可正常運作）。若要改用真的 Claude API：
+改完程式想確認沒改壞，跑無頭測試（不需要開瀏覽器）：
+
+```bash
+./venv/Scripts/python.exe smoke_test.py
+```
+
+## 上傳自己的資料
+
+`csv-template.csv` 是完整欄位範本。只有「客戶名稱」與「合約到期日」是必填，
+其餘欄位缺少時，該構面的權重會**按比例分配給其他構面**（缺資料不等於 0 分）。
+
+`demo-customers.csv` 是舊版 9 欄格式的 24 筆資料，仍然可以正常上傳，用來驗證相容性。
+
+⚠️ **想看到 NRR / GRR，CSV 必須有「上期ARR」欄位。** 留存率比較的是同一批客戶在兩個
+時間點的差異，單一時間點的快照算不出來 —— 缺這欄時儀表板會明確告知，而不是顯示 0。
+
+## 健康分數
+
+六個構面加權計算，總分 0–100：席位採用率 25%、客服健康度 20%、使用頻率 15%、
+導入完成度 15%、滿意度 15%、互動新鮮度 10%。
+燈號：🟢 75 分以上／🟡 50–74 分／🔴 50 分以下。
+
+「生命週期階段」（導入→採用→成熟→續約中）與「風險燈號」是兩個獨立維度：
+成熟客戶一樣可能是紅燈。計分規則全部集中在 `scoring.py`，方便單獨檢視與修改。
+
+## 用 Claude 生成風險說明（選用）
+
+預設使用內建規則引擎，不需要任何金鑰就能正常運作。若要改用 Claude API：
 
 1. 到 https://console.anthropic.com 申請一組 API 金鑰
-2. 在本機執行前，設定環境變數：
-   ```bash
-   export ANTHROPIC_API_KEY=你的金鑰
-   ```
-3. 重新啟動 `streamlit run app.py`，畫面上的「使用真實 AI」開關會自動變成可勾選
-
-呼叫 Claude API 會依用量產生極少量費用（單次生成約新台幣不到 1 元）。
-
-## 部署成公開連結（Streamlit Community Cloud，免費）
-
-1. 把這個資料夾推上 GitHub（可以是 private repo）
-2. 到 https://share.streamlit.io 用 GitHub 帳號登入，選擇這個 repo，指定 `app.py` 為進入檔案
-3. 在 Streamlit Cloud 後台的 "Secrets" 設定裡加入：
+2. 設定環境變數 `ANTHROPIC_API_KEY`，或在 Streamlit Cloud 的 Secrets 加入
    ```toml
    ANTHROPIC_API_KEY = "你的金鑰"
    ```
-   （金鑰只存在 Streamlit 伺服器端，不會出現在任何前端程式碼或公開連結裡）
-4. 部署完成後會拿到一個 `https://xxx.streamlit.app` 的公開連結，可以直接放履歷
+3. 重新啟動後，側邊欄的「用 Claude 生成風險說明」開關就會變成可勾選
+
+單次生成約新台幣不到 1 元。
+
+## 部署成公開連結（Streamlit Community Cloud，免費）
+
+1. 把這個資料夾推上 GitHub
+2. 到 https://share.streamlit.io 用 GitHub 帳號登入，選這個 repo，指定 `app.py` 為進入檔案
+3. 部署完成後會拿到 `https://xxx.streamlit.app` 的連結
+
+⚠️ **兩個一定要知道的坑：**
+
+- **來源 repo 是 private 時，App 網址預設也要求瀏覽者登入。** 部署後要自己到
+  App 的 Settings → Sharing，手動改成「This app is public」，才是真正公開的連結。
+- **免費版會休眠。** 幾天沒人開就會進入睡眠，下一位訪客要等約 30 秒冷啟動。
+  面試前 10 分鐘先自己開一次把它喚醒。
 
 ## 檔案說明
 
-- `app.py`：主程式
-- `csv-template.csv`：CSV 欄位範本
-- `demo-customers.csv`：24 筆虛構示範客戶資料（涵蓋高中低風險與續約風險情境）
-- `plan.md`：這個作品的規劃紀錄
+| 檔案 | 內容 |
+| :-- | :-- |
+| `app.py` | 儀表板主畫面與五個頁面 |
+| `scoring.py` | 健康分數與組合層指標（ARR/NRR/GRR/NPS/CSAT）的計算邏輯 |
+| `demo_data.py` | 展示模式的虛構客戶資料 |
+| `advice.py` | 風險說明與建議行動（規則引擎＋Claude API 兩種來源） |
+| `smoke_test.py` | 無頭測試：跑過五個頁面與 14 位客戶的詳情頁，確認沒有例外 |
+| `csv-template.csv` | 上傳模式的完整欄位範本 |
+| `demo-customers.csv` | 舊版 9 欄格式的 24 筆資料，用於驗證向下相容 |
+| `.streamlit/config.toml` | 深色主題設定 |
+| `plan.md` | 這個作品的規劃紀錄 |
